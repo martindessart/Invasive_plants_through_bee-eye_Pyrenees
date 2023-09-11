@@ -1,0 +1,93 @@
+---
+title: "Supplementary material: Principal component analysis"
+author: "Martin Dessart"
+date: "11/09/2023"
+output:
+  html_document:
+    toc: true
+    theme: united
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=15,fig.height=8)
+```
+
+# Prepare data
+
+```{r,warning=FALSE, message=FALSE}
+library(dplyr)
+library(factoextra)
+library(NbClust)
+library(ggbiplot)
+rm(list=ls())
+set.seed(666) #Fixe noyau aléatoire
+
+setwd("/Users/martin/Downloads/Github_DATA/0_Data")
+load("AllData.RData")
+```
+
+# PCA Analysis
+
+
+## Assess clustering tendency
+
+```{r,warning=FALSE, message=FALSE}
+df<-A.hexAll[4:5]
+get_clust_tendency(df,2)
+```
+
+
+## Find number of clusters using NbClust method
+
+```{r,warning=FALSE, message=FALSE}
+NbClust<-NbClust(data = df, diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "kmeans")
+```
+
+## Find number of clusters using the silhouette method
+
+```{r,warning=FALSE, message=FALSE}
+df<-A.hexAll[4:5]
+fviz_nbclust(df, kmeans, method = "silhouette")
+```
+
+## PCA Analysis
+
+
+```{r,warning=FALSE, message=FALSE}
+PR <- prcomp(df, scale. = TRUE)
+k1 <- kmeans(df, 2, nstart=25, iter.max=1000)
+Newcat<-k1$cluster
+
+colo2<-"#E3AD3B"
+colo1<-"#7A5E79"
+
+a<-seq(0, 0, length.out = 73)
+b<-tibble(a)
+b$a<-as.character(b$a)
+b<-b %>% mutate(a="")
+b[1,1]<-"IG_P"
+b[11,1]<-"RJ"
+b[22,1]<-"SJ"
+b[52,1]<-"IG_W"
+b[8,1]<-"BD"
+b[45,1]<-"IG_V"
+
+ggbiplot(PR,obs.scale=1,var.scale=1,groups=as.factor(Newcat),
+         ellipse=TRUE,labels = b$a,labels.size = 10)+
+  geom_point(aes(colour=as.factor(Newcat)), size = 3) +
+  theme(axis.title=element_text(size=20))+
+  theme_classic()+
+  scale_color_manual(values=c(colo2,colo1))+
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=20),
+        legend.title = element_text(size=20),
+        legend.text = element_text(size=20),
+        legend.position = "F")
+
+
+
+```
+

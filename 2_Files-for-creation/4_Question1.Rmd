@@ -1,0 +1,286 @@
+---
+title: "Question 1: Do invasive floral species have more salient visual cues to the bee eye?"
+author: "Martin Dessart"
+date: "11/09/2023"
+output:
+  html_document:
+    toc: true
+    theme: united
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=15,fig.height=8)
+```
+
+# Libraries
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+library(zoom)
+library(pavo)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(gtools)
+library(pdist)
+library(lme4)
+library(lattice)
+library(car)
+library(ggpubr)
+library(vegan)
+library(devtools)
+library(pairwiseAdonis)
+library(RVAideMemoire)
+library(tidyr)
+
+rm(list=ls())
+set.seed(666) #Fixe noyau aléatoire
+
+setwd("/Users/martin/Downloads/Github_DATA/0_Data")
+load("AllData.RData")
+
+cc<-"#842C1F"
+ci<-"#BE773C"
+ce<-"#E6BF6D"
+cn<-"#375621"
+
+```
+
+
+# 1) Relative frequency of the invasive species and the two groups of native species in each sampled zone
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+gf3a<- gf2 %>% filter(zone=="core") %>% mutate(z2="Core")
+gf3b<- gf2 %>% filter(zone=="internal") %>% mutate(z2="Inner Edge")
+gf3c<- gf2 %>% filter(zone=="external") %>% mutate(z2="Outer Edge")
+gf3d<- gf2 %>% filter(zone=="neighborhood") %>% mutate(z2="Surrounding")
+
+gf3<-bind_rows(gf3a,gf3b,gf3c,gf3d)
+ggplot(gf3,aes(x=cat, y=abundance,color=z2,fill=z2))+
+  geom_col(position = position_dodge(width = 0.94))+
+  labs(y="Relative abundance (%)",x="")+
+  scale_color_manual(values=c(cc,ci,ce,cn))+
+  scale_fill_manual(values=c(cc,ci,ce,cn))+
+  theme_classic()+
+  labs(fill="Zone")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(size=22,face = "bold"))+
+  theme(axis.text=element_text(size=30))+
+  theme(plot.margin = margin(1,1,1,1, "cm"))+
+  theme(axis.title=element_text(size=30))+
+  theme(legend.title = element_text(size=30),
+        legend.text = element_text(size=30),
+        strip.text = element_text(size = 30))+
+  theme(legend.position="none")+
+  theme(axis.ticks.length=unit(0.5, "cm"))+
+  theme(axis.line=element_line(size=1.2))+
+  theme(axis.ticks = element_line(colour = "black", size = 1.2))
+
+
+```
+
+# 2) Chromatic contrast, achromatic contrast and spectral purity of Group1, Group 2 and the invasive species analyzed in our study
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+Ap2<-APIS%>%
+  filter(cat!="autoch"&cat!="OR"&cat!="EK"&cat!="SI"&cat!="OE"&cat!="SNI")
+Ap2G<-Ap2%>%
+  filter(cat=="inv"|cat=="gp1"|cat=="gp2")
+AI<-Ap2%>%
+  filter(cat!="inv"&cat!="gp1"&cat!="gp2")
+ApG<-APIS %>% filter(cat=="inv"|cat=="gp1"|cat=="gp2")
+ApG <- ApG %>% 
+  mutate(cat = str_replace(cat, "inv", "Invasives")) %>% 
+  mutate(cat = str_replace(cat, "gp1", "Group 1")) %>% 
+  mutate(cat = str_replace(cat, "gp2", "Group 2")) 
+
+colo1<-"#E3AD3B"
+colo2<-"#7A5E79"
+colo2F<-"#D0A952"
+colo3<-"#C00000"
+ggplot(ApG,aes(y=dS,x=cat,color=cat))+
+  geom_boxplot(size=1.5)+
+  geom_point(size=1.5)+
+  stat_summary(fun = "mean", geom = "point",size=3,color="black",shape=15)+
+  theme_classic()+
+  labs(y="Chromatic contrast (HU)",x="")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(size=22,face = "bold"))+
+  theme(axis.text=element_text(size=30),
+        axis.title=element_text(size=30))+
+  scale_color_manual(values=c(colo2,colo1,colo3))+ #GLY2
+  theme(legend.title = element_text(size=30),
+        legend.text = element_text(size=30))+
+  theme(legend.position = "none",
+        strip.text = element_text(size = 30))+
+  stat_compare_means(comparisons = list(c("Group 2","Invasives"),c("Group 1","Invasives")),
+                     method.args = list(alternative = "greater"),
+                     aes(label = ..p.signif..),
+                     bracket.size = 1,size=5)
+
+kruskal.test(dS~cat,data=ApG)
+
+ggplot(ApG,aes(y=dL,x=cat,color=cat))+
+  geom_boxplot(size=1.5)+
+  geom_point(size=1.5)+
+  stat_summary(fun = "mean", geom = "point",size=3,color="black",shape=15)+
+  theme_classic()+
+  labs(y="Achromatic contrast",x="")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(size=22,face = "bold"))+
+  theme(axis.text=element_text(size=30),
+        axis.title=element_text(size=30))+
+  scale_color_manual(values=c(colo2,colo1,colo3))+ #GLY2
+  theme(legend.title = element_text(size=30),
+        legend.text = element_text(size=30))+
+  theme(legend.position = "none",
+        strip.text = element_text(size = 30))+
+  stat_compare_means(comparisons = list(c("Group 2","Invasives"),c("Group 1","Invasives")),
+                     method.args = list(alternative = "greater"),
+                     aes(label = ..p.signif..),
+                     bracket.size = 1,size=5)
+
+kruskal.test(dL~cat,data=ApG)
+
+ggplot(ApG,aes(y=purity,x=cat,color=cat))+
+  geom_boxplot(size=1.5)+
+  geom_point(size=1.5)+
+  stat_summary(fun = "mean", geom = "point",size=3,color="black",shape=15)+
+  theme_classic()+
+  labs(y="Spectral purity (HU)",x="")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(size=22,face = "bold"))+
+  theme(axis.text=element_text(size=30),
+        axis.title=element_text(size=30))+
+  scale_color_manual(values=c(colo2,colo1,colo3))+ #GLY2
+  theme(legend.title = element_text(size=30),
+        legend.text = element_text(size=30))+
+  theme(legend.position = "none",
+        strip.text = element_text(size = 30))+
+  stat_compare_means(comparisons = list(c("Group 2","Invasives"),c("Group 1","Invasives")),
+                     method.args = list(alternative = "greater"),
+                     aes(label = ..p.signif..),
+                     bracket.size = 1,size=5)
+
+
+
+kruskal.test(purity~cat,data=ApG)
+
+
+```
+
+# 3) Chromatic contrast, achromatic contrast and spectral purity of Group1, Group 2 and the invasive species according to the sampling zones
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+colo1<-"#E3AD3B"
+colo2<-"#7A5E79"
+colo2F<-"#D0A952"
+colo3<-"#C00000"
+gfbis<-gf1 %>% mutate(cat=str_replace(cat,"inv","Inv.")) %>% 
+  mutate(cat=str_replace(cat,"gp1","G.1")) %>% 
+  mutate(cat=str_replace(cat,"gp2","G.2")) 
+gfbis$patch<-as.factor(gfbis$patch)
+gfbis$cat<-factor(gfbis$cat,levels=(c("Inv.","G.1",
+                                      "G.2")))
+gfOK<-gfbis %>% mutate(zone=str_replace(zone,"core","Core")) %>% 
+  mutate(zone=str_replace(zone,"internal","Inner Edge")) %>% 
+  mutate(zone=str_replace(zone,"external","Outer Edge")) %>% 
+  mutate(zone=str_replace(zone,"neighborhood","Surrounding"))
+
+
+t1<-gfOK %>% filter(cat!="Inv.")
+t2<-gfOK %>% filter(cat=="Inv.") %>% filter(species!="Impatiens_glandulifera")
+APGF<-APIS %>% mutate(cat=str_replace(cat,"inv","Inv."))
+
+apInv1<-APGF[1:3,] %>% mutate(zone="Core")
+apInv2<-APGF[1:3,] %>% mutate(zone="Inner Edge")
+apInv3<-APGF[1:3,] %>% mutate(zone="Outer Edge")
+apInv4<-APGF[1:3,] %>% mutate(zone="Surrounding")
+
+t2I<-bind_rows(t2,apInv1,apInv2,apInv3,apInv4)
+
+colIG_P<-"#BFDC96"
+colIG_V<-"#DD7B75"
+colIG_W<-"#D6C3C8"
+colBD<-"#102DE4"
+colRJ<-"#E2B33F"
+colSJ<-"#9E3DD0"
+
+ggplot(NULL)+
+  geom_point(data=t2I,aes(y=dS,x=cat,fill=species),size=6,shape=21,
+             position=position_dodge(width=0.1))+
+  geom_boxplot(data=t1,aes(y=dS,x=cat,color=cat),outlier.shape = NA,size=1.7)+
+  geom_point(data=t1,aes(y=dS,x=cat,color=cat),alpha=0.5,size=2)+
+  stat_summary(data=t1,aes(y=dS,x=cat,group=cat),fun = "mean", geom = "point",size=3,shape=15,color="black",position=position_dodge(width=0.7))+
+  scale_color_manual(values=c(colo2,colo2F))+
+  scale_fill_manual(values=c(colBD,colIG_P,colIG_V,colIG_W,colRJ,colSJ))+
+  labs(y="Chromatic contrast (HU)",x="Zone")+
+  theme_classic()+
+  theme(axis.text=element_text(size=30,color="black"),
+        axis.title=element_text(size=40),
+        legend.title = element_text(size=30),
+        legend.text = element_text(size=30),
+        legend.key.height= unit(2, 'cm'),
+        legend.key.width= unit(2, 'cm'))+
+  theme(axis.ticks.length=unit(0.5, "cm"))+
+  theme(axis.line=element_line(size=1.2))+
+  theme(axis.ticks = element_line(colour = "black", size = 1.2))+
+  theme(legend.position="none")+
+  facet_wrap(~zone,nrow=1)+
+  guides(colour=guide_legend(title="Site"))+
+  theme(legend.position = "none",
+        strip.text = element_text(size = 30))
+
+ggplot(NULL)+
+  geom_point(data=t2I,aes(y=dL,x=cat,fill=species),size=6,shape=21,
+             position=position_dodge(width=0.6))+
+  geom_boxplot(data=t1,aes(y=dL,x=cat,color=cat),outlier.shape = NA,size=1.7)+
+  geom_point(data=t1,aes(y=dL,x=cat,color=cat),alpha=0.5,size=2)+
+  stat_summary(data=t1,aes(y=dL,x=cat,group=cat),fun = "mean", geom = "point",size=3,shape=15,color="black",position=position_dodge(width=0.7))+
+  scale_color_manual(values=c(colo2,colo2F))+
+  scale_fill_manual(values=c(colBD,colIG_P,colIG_V,colIG_W,colRJ,colSJ))+
+  labs(y="Achromatic contrast",x="Zone")+
+  theme_classic()+
+  theme(axis.text=element_text(size=30,color="black"),
+        axis.title=element_text(size=40),
+        legend.title = element_text(size=30),
+        legend.text = element_text(size=30),
+        legend.key.height= unit(2, 'cm'),
+        legend.key.width= unit(2, 'cm'))+
+  theme(axis.ticks.length=unit(0.5, "cm"))+
+  theme(axis.line=element_line(size=1.2))+
+  theme(axis.ticks = element_line(colour = "black", size = 1.2))+
+  theme(legend.position="none")+
+  facet_wrap(~zone,nrow=1)+
+  guides(colour=guide_legend(title="Site"))+
+  theme(legend.position = "none",
+        strip.text = element_text(size = 30))
+
+ggplot(NULL)+
+  geom_point(data=t2I,aes(y=purity,x=cat,fill=species),size=6,shape=21,
+             position=position_dodge(width=0.1))+
+  geom_boxplot(data=t1,aes(y=purity,x=cat,color=cat),outlier.shape = NA,size=1.7)+
+  geom_point(data=t1,aes(y=purity,x=cat,color=cat),alpha=0.5,size=2)+
+  stat_summary(data=t1,aes(y=purity,x=cat,group=cat),fun = "mean", geom = "point",size=3,shape=15,color="black",position=position_dodge(width=0.7))+
+  scale_color_manual(values=c(colo2,colo2F))+
+  scale_fill_manual(values=c(colBD,colIG_P,colIG_V,colIG_W,colRJ,colSJ))+
+  labs(y="Spectral purity (HU)",x="Zone")+
+  theme_classic()+
+  theme(axis.text=element_text(size=30,color="black"),
+        axis.title=element_text(size=40),
+        legend.title = element_text(size=30),
+        legend.text = element_text(size=30),
+        legend.key.height= unit(2, 'cm'),
+        legend.key.width= unit(2, 'cm'))+
+  theme(axis.ticks.length=unit(0.5, "cm"))+
+  theme(axis.line=element_line(size=1.2))+
+  theme(axis.ticks = element_line(colour = "black", size = 1.2))+
+  theme(legend.position="none")+
+  facet_wrap(~zone,nrow=1)+
+  guides(colour=guide_legend(title="Site"))+
+  theme(legend.position = "none",
+        strip.text = element_text(size = 30))
+
+```
+

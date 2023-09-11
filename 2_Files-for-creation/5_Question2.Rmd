@@ -1,0 +1,172 @@
+---
+title: "Question 2: Are pollinators able to discriminate invasive flowers species from native flowers species?"
+author: "Martin Dessart"
+date: "11/09/2023"
+output:
+  html_document:
+    toc: true
+    theme: united
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=15,fig.height=8)
+```
+
+# Libraries
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+library(zoom)
+library(pavo)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(gtools)
+library(pdist)
+library(lme4)
+library(lattice)
+library(car)
+library(ggpubr)
+library(vegan)
+library(devtools)
+library(pairwiseAdonis)
+library(RVAideMemoire)
+
+rm(list=ls())
+set.seed(666) #Fixe noyau aléatoire
+
+setwd("/Users/martin/Downloads/Github_DATA/0_data")
+load("AllData.RData")
+
+SIn<-SInv%>%
+  setNames(paste0('I', names(.)))
+Sg1<-S1%>%
+  setNames(paste0('y', names(.)))
+Sg2<-S2%>%
+  setNames(paste0('z', names(.)))
+SIR<-SInv%>%
+  select(Impatiens_glandulifera_P)%>%
+  setNames(paste0('U', names(.)))
+SIW<-SInv%>%
+  select(Impatiens_glandulifera_W)%>%
+  setNames(paste0('W', names(.)))
+SIV<-SInv%>%
+  select(Impatiens_glandulifera_V)%>%
+  setNames(paste0('V', names(.)))
+SIA<-SInv%>%
+  select(Buddleja_davidii,Reynoutria_japonica,Spiraea_japonica)
+colo1<-"#E3AD3B"
+colo2<-"#7A5E79"
+colo3<-"#C00000"
+
+```
+
+
+# Comparison between Invasive group and Group1 - Group2
+
+## Check Homogeneity of variance
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+N2<-bind_cols(Sg1,Sg2,SIn)
+N2<-N2
+N2<-as.rspec(N2)
+V2<-vismodel(N2, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean$dat, illum="D65")
+AV2 <- colspace(V2, space="hexagon")
+D2<-coldist(AV2,achromatic = TRUE)
+matS2 <- dist(coldist2mat(D2)[['dS']])
+group2 <- substring(rownames(as.matrix(matS2)), 1, 1)
+
+bdispS <- betadisper(matS2, group2, type='centroid') #Verify intra-homogeneity
+anova(bdispS) #OK No intra-difference
+#TukeyHSD(bdispS)
+```
+
+## PERMANOVA
+
+```{r,warning=FALSE, message=FALSE}
+pmanovaS <- adonis(matS2~group2)
+pmanovaS
+```
+
+## Bootstrap method
+
+```{r,warning=FALSE, message=FALSE}
+#bootstrap
+boot2 <- bootcoldist(AV2, by=group2)
+es1<-as_tibble(boot2) %>% mutate(yo=c("G1-Invasives" ,"G1-G2", "G2-Invasives"))
+
+ggplot(es1,aes(x=yo,y=dS.mean))+
+  geom_hline(yintercept=0.1, linetype="dashed",size=2)+
+  geom_pointrange(aes(ymin=dS.lwr,ymax=dS.upr,color=as.factor(yo)),size=2,linewidth=2)+
+  theme_classic()+
+  labs(y="Chromatic contrast (HU)",x="Centroid comparison")+
+theme(axis.title=element_text(size=50))+
+  theme_minimal()+
+  scale_color_manual(values=c(colo3,colo2,colo1))+
+  theme(axis.text=element_text(size=30,color="black"),
+        axis.title=element_text(size=30),
+        legend.title = element_text(size=30),
+        legend.text = element_text(size=30),
+        legend.key.height= unit(2, 'cm'),
+        legend.key.width= unit(2, 'cm'))+
+  theme(axis.ticks.length=unit(0.5, "cm"))+
+  theme(axis.line=element_line(size=1.2))+
+  theme(axis.ticks = element_line(colour = "black", size = 1.2))+
+  theme(legend.position="none")
+```
+
+# Comparison between individual Invasive flowers and Group 1 - Group 2
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+#GROUP 1 -
+N5<-bind_cols(Sg1,SIR,SIW,SIV,SIA)
+N5<-as.rspec(N5)
+V5<-vismodel(N5, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean$dat, illum="D65")
+AV5 <- colspace(V5, space="hexagon")
+D5<-coldist(AV5,achromatic = TRUE)
+matS5 <- dist(coldist2mat(D5)[['dS']])
+group5 <- substring(rownames(as.matrix(matS5)), 1, 1)
+boot5 <- bootcoldist(AV5, by=group5,n=c(1,2,3),subset="y",weber=0.1,weber.achro=0.1)
+
+#GROUP 2 -
+N4<-bind_cols(Sg2,SIR,SIW,SIV,SIA)
+N4<-as.rspec(N4)
+V4<-vismodel(N4, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean$dat, illum="D65")
+AV4 <- colspace(V4, space="hexagon")
+D4<-coldist(AV4,achromatic = TRUE)
+matS4 <- dist(coldist2mat(D4)[['dS']])
+group4 <- substring(rownames(as.matrix(matS4)), 1, 1)
+boot4 <- bootcoldist(AV4, by=group4,n=c(1,2,3),subset="z",weber=0.1,weber.achro=0.1)
+
+es2<-as_tibble(boot5)%>% 
+  mutate(yo=c("Bd" ,"Rj", "Sj","Ig P","Ig V","Ig W")) %>% 
+  mutate(gp=1)
+es3<-as_tibble(boot4)%>% 
+  mutate(yo=c("Bd" ,"Rj", "Sj","Ig P","Ig V","Ig W"))%>% 
+  mutate(gp=2)
+est<-bind_rows(es2,es3)
+est$yo<-factor(est$yo,levels=c("Bd" ,"Rj", "Sj","Ig P","Ig V","Ig W"))
+
+#1000*700
+ggplot(est,aes(x=yo,y=dS.mean))+
+  geom_hline(yintercept=0.1, linetype="dashed",size=2)+
+  geom_pointrange(aes(ymin=dS.lwr,ymax=dS.upr,color=as.factor(gp)),size=2,linewidth=2)+
+  theme_minimal()+
+  labs(y="Chromatic contrast (HU)",x="")+
+  theme(axis.title=element_text(size=50))+
+  scale_color_manual(values=c(colo2,colo1))+
+  theme(axis.text=element_text(size=30,color="black"),
+        axis.title=element_text(size=30),
+        legend.title = element_text(size=30),
+        legend.text = element_text(size=30),
+        legend.key.height= unit(2, 'cm'),
+        legend.key.width= unit(2, 'cm'))+
+  theme(axis.ticks.length=unit(0.5, "cm"))+
+  theme(axis.line=element_line(size=1.2))+
+  theme(axis.ticks = element_line(colour = "black", size = 1.2))+
+  theme(legend.position="top")+
+  labs(color="Groups")
+
+```
+

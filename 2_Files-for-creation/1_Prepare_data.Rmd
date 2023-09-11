@@ -1,0 +1,420 @@
+---
+title: "Data treatment"
+author: "Martin Dessart"
+date: "11/09/2023"
+output:
+  html_document:
+    toc: true
+    theme: united
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=15,fig.height=8)
+```
+
+# Prepare data
+
+```{r,warning=FALSE, message=FALSE}
+library(dplyr)
+library(data.table)
+library(factoextra)
+library(ggplot2)
+library(devtools)
+library(NbClust)
+library(devtools)
+library(ggbiplot)
+library(pavo)
+library(stringr)
+library(gtools)
+library(pdist)
+library(vegan)
+library(conflicted)
+library(tidyr)
+conflict_prefer("rename", "dplyr")
+conflict_prefer("mutate", "dplyr")
+conflict_prefer("filter", "dplyr")
+
+rm(list=ls())
+set.seed(666) #Fix kernell
+setwd("/Users/martin/Downloads/Github_DATA/0_Data")
+
+#Wavelength
+wl<-seq(300,700,by=1)
+wl<-as_tibble(wl)
+names(wl)<-c("wl")
+
+#apis photoreceptors
+apis<-read.table("apis-photoreceptors.csv",sep=";",header=TRUE)
+names(apis) <- c("wl","s", "m", "l")
+apis<-as.rspec(apis)
+
+#apis max excitation
+apis_ev<-read.table("SFZ Honey.txt", header = T) 
+names(apis_ev) <- c("EUV","EBL","EGR")
+#For hexagon models
+apis_ev_Hex<- data.frame(0.8667*(apis_ev$EGR - apis_ev$EUV), (apis_ev$EBL) - 0.5*(apis_ev$EUV+apis_ev$EGR))
+colnames(apis_ev_Hex)<- c("x", "y")
+
+#For COC models
+apis_ev_Coc<- data.frame(-9.86*apis_ev$EUV+7.70*apis_ev$EBL+2.16*apis_ev$EGR,
+                         -5.17*apis_ev$EUV+20.25*apis_ev$EBL-15.08*apis_ev$EGR)
+colnames(apis_ev_Coc)<- c("x", "y")
+
+#Leaves samples
+Fe<-read.table("Feuilles.txt",sep="\t",header=TRUE)
+Fe<-Fe%>%filter(Wavelength<701 & Wavelength>300)
+Fe<-as.rspec(Fe) 
+regex <- gsub('\\d', '', names(Fe))[-1]
+Fme<-  aggspec(Fe, by = regex, FUN = mean)
+Fme <- procspec(Fme, opt = "smooth", span = 0.2)
+Fme <- procspec(Fme, fixneg="addmin")
+Fmean<- aggspec(Fme, by=NULL, FUN=mean)
+
+rm(apis_ev,Fe)
+
+
+```
+
+## Spectral data treatment
+
+```{r,warning=FALSE, message=FALSE}
+setwd("/Users/martin/Downloads/Github_DATA/0_Data")
+All<-read.table("FLOWERS_TOTAL.csv",sep="")
+All<-as.rspec(All)
+#Create first regex to delete patch
+regex <- gsub('_[A-Z]_', '', names(All))[-1]
+#Create second regex to delete the number
+regex2 <- gsub('\\d', '', regex)
+#Create a third regex to delete new letter
+regex3 <- gsub('_[A-Z]_', '', regex2)
+#mean data by species
+AllN<-  aggspec(All, by = regex3, FUN = mean)
+
+#mean impatiens_glandulifera petal and labium
+regex <- gsub('_[L-P]', '', names(AllN))[-1]
+Allf<-  aggspec(AllN, by = regex, FUN = mean)
+
+#rename
+AllF<-Allf %>% 
+  rename(Impatiens_glandulifera_P=Impatiens_glanduliferar) %>% 
+  rename(Impatiens_glandulifera_W=Impatiens_glanduliferab) %>% 
+  rename(Impatiens_glandulifera_V=Impatiens_glanduliferap)
+
+```
+
+## Create subsets
+
+```{r,warning=FALSE, message=FALSE}
+#Invasive subset
+SInv<-AllF%>%
+  select("wl",contains(c("Impatiens","Budd","Reynoutria","Spir")))
+
+#Group 1, after "Data_clustering part
+S1<-AllF%>%
+  select("wl",
+         'Achillea_millefolium',
+         'Aegopodium_podagraria',
+         'Alliaria_petiolata',
+         'Angelica_sylvestris',
+         'Anthriscus_sylvestris',
+         'Bellis_perennis',
+         'Buddleja_davidii',
+         'Campanula_persicifolia',
+         'Centaurea_nigra',
+         'Cirsium_arvense',
+         'Clinopodium_vulgare',
+         'Colchicum_autumnale',
+         'Convolvulus_arvensis',
+         'Convolvulus_sepium',
+         'Daucus_carota',
+         'Erica_tetralix',
+         'Erigeron_karvinskianus',
+         'Eupatorium_cannabinum',
+         'Filipendula_ulmaria',
+         'Galium_aparine',
+         'Galium_verum',
+         'Geranium_robertianum',
+         'Hypochaeris_radicata',
+         'Impatiens_glandulifera_P',
+         'Impatiens_glandulifera_V',
+         'Impatiens_glandulifera_W',
+         'Jasione_montana',
+         'Lamium_maculatum',
+         'Leucanthemum_vulgare',
+         'Malva_alcea',
+         'Malva_sylvestris',
+         'Melilotus_albus',
+         'Mentha_suaveolens',
+         'Myosotis_arvensis',
+         'Oenothera_rosea',
+         'Origanum_vulgare',
+         'Prunella_vulgaris',
+         'Reynoutria_japonica',
+         'Rhinanthus_angustifolius',
+         'Rubus_caesius',
+         'Sambucus_ebulus',
+         'Sambucus_nigra',
+         'Saponaria_officinalis',
+         'Scabiosa_columbaria',
+         'Solanum_nigrum',
+         'Spiraea_japonica',
+         'Thymus_praecox',
+         'Trifolium_pratense',
+         'Trifolium_repens',
+         'Valeriana_officinalis',
+         'Veronica_arvensis',
+         'Veronica_chamaedrys',
+         'Veronica_persica',
+         'Vicia_sepium'
+         )
+
+#Group 2
+S2<-AllF%>%
+  select('wl',
+         'Agrimonia_eupatoria',
+         'Helminthia_echioides',
+         'Hypericum_maculatum',
+         'Hypericum_perforatum',
+         'Lapsana_communis',
+         'Lathyrus_pratensis',
+         'Lotus_corniculatus',
+         'Oenothera_erythrosepala',
+         'Potentilla_crantzii',
+         'Potentilla_erecta',
+         'Potentilla_reptans',
+         'Ranunculus_repens',
+         'Senecio_inaequidens',
+         'Sinapis_arvensis',
+         'Taraxacum_officinale',
+         'Tussilago_farfara',
+         'Ulex_europaeus',
+         'Verbascum_thapsus'
+         )
+
+```
+
+
+# Models
+
+## Apis hexagon & COC model
+
+```{r,warning=FALSE, message=FALSE}
+#All flowers
+A.VAll <- vismodel(AllF,
+                   qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l",
+                   visual = apis, bkg = Fmean[,2], illum="D65")
+#Invasive
+A.Inv <- vismodel(SInv,
+                  qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l",
+                  visual = apis, bkg = Fmean[,2], illum="D65")
+#Gp1
+A.Gp1 <- vismodel(S1,
+                  qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l",
+                  visual = apis, bkg = Fmean[,2], illum="D65")
+#Gp2
+A.Gp2 <- vismodel(S2,
+                  qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l",
+                  visual = apis, bkg = Fmean[,2], illum="D65")
+
+#Hexagon model 
+
+#All
+A.hexAll <- colspace(A.VAll, space = "hexagon")
+#Invasives
+A.hexInv<-colspace(A.Inv, space = "hexagon")
+#Gp1
+A.hexGp1 <- colspace(A.Gp1, space = "hexagon")
+#Gp2
+A.hexGp2 <- colspace(A.Gp2, space = "hexagon")
+
+#COC model
+
+#All
+C.cocAll <- colspace(A.VAll, space = "coc")
+#Invasives
+C.cocInv <- colspace(A.Inv, space = "coc")
+#Gp1
+C.cocGp1 <- colspace(A.Gp1, space = "coc")
+#Gp2
+C.cocGp2 <- colspace(A.Gp2, space = "coc")
+
+```
+
+
+# Contrasts calcul
+
+## Contrast chromatic and achromatic contrasts
+
+```{r,warning=FALSE, message=FALSE}
+#Invasive as group
+inv<- bind_cols(Fmean,SInv) %>% 
+  select(!wl...3)
+inv<-as.rspec(inv)
+Vinv<-vismodel(inv, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean[,2], illum="D65")
+Ainv <- colspace(Vinv, space = "hexagon")
+Cinv<-coldist(Ainv,achromatic = TRUE, subset="dat")
+Cinv<-Cinv%>%
+  mutate(cat="inv")
+Cinv
+#Invasive as individual
+invU<-inv%>%
+  rename(IG_P=Impatiens_glandulifera_P)%>%
+  rename(IG_V=Impatiens_glandulifera_V)%>%
+  rename(IG_W=Impatiens_glandulifera_W)%>%
+  rename(BD=Buddleja_davidii)%>%
+  rename(RJ=Reynoutria_japonica)%>%
+  rename(SJ=Spiraea_japonica)
+VinvU<-vismodel(invU, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean[,2], illum="D65")
+AinvU <- colspace(VinvU, space = "hexagon")
+CinvU<-coldist(AinvU,achromatic = TRUE, subset="dat")
+CinvU<-CinvU%>%
+  mutate(cat=patch2)
+CinvU
+
+
+#Group 1
+gp1<- bind_cols(Fmean,S1)
+gp1<-gp1%>%select(!wl...3)
+gp1<-as.rspec(gp1)
+Vgp1<-vismodel(gp1, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean[,2], illum="D65")
+Agp1 <- colspace(Vgp1, space = "hexagon")
+Cgp1<-coldist(Agp1,achromatic = TRUE, subset="dat")
+Cgp1<-Cgp1%>%
+  mutate(cat="gp1")
+Cgp1
+
+#Group 2
+gp2<- bind_cols(Fmean,S2)
+gp2<-gp2%>%select(!wl...3)
+gp2<-as.rspec(gp2)
+Vgp2<-vismodel(gp2, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean[,2], illum="D65")
+Agp2 <- colspace(Vgp2, space = "hexagon")
+Cgp2<-coldist(Agp2,achromatic = TRUE, subset="dat")
+Cgp2<-Cgp2%>%
+  mutate(cat="gp2")
+Cgp2
+
+#Bind all data
+Ctot<-bind_rows(Cinv,Cgp1,Cgp2,CinvU)
+```
+
+# Calcul Spectral purity
+
+## Data preparation
+
+```{r,warning=FALSE, message=FALSE}
+#INVASIVES AS INDIVIDUALS
+SInvU<-SInv%>%
+rename(IG_P=Impatiens_glandulifera_P)%>%
+  rename(IG_V=Impatiens_glandulifera_V)%>%
+  rename(IG_W=Impatiens_glandulifera_W)%>%
+  rename(BD=Buddleja_davidii)%>%
+  rename(RJ=Reynoutria_japonica)%>%
+  rename(SJ=Spiraea_japonica)
+#create vismodel for apis
+A.InvU <- vismodel(SInvU, qcatch = "Ei", relative = FALSE, vonkries = TRUE, achromatic = "l", visual = apis, bkg = Fmean[,2], illum="D65")
+
+#create space for apis and COC
+A.hexInvU <- colspace(A.InvU, space = "hexagon")
+C.cocInvU <- colspace(A.InvU, space = "coc")
+
+# Spectral purity calculation function # ADAPTED FROM JOAO ROBAZZI
+pureza <- function(main, mono) {
+  #Create vectors
+  wl<-seq(300,640, by=10) #max excitation
+  Wmin <- vector("numeric", nrow(main)) #nb
+  distance <- vector("numeric", nrow(main)) #distance flower-max excitation
+  dist0 <- vector("numeric", nrow(main)) #distance flower-bck
+  
+  #loop for each flower x,y, in mono
+  for (i in 1:nrow(main)) {
+    dRaw <- pdist(main[i, c("x", "y")], mono)@dist #dist flower-all max exictation
+    dist0[i] <- pdist(main[i, c("x", "y")], c(0,0))@dist #dist flower-bck
+    Wmin[i] <- which.min(dRaw) #choose min
+    distance[i] <- pdist(mono[Wmin[i], c("x", "y")], c(0,0))@dist #calculate dist
+    MaxEx<-wl[Wmin] #select wl
+  }
+  names(Wmin) <- names(distance) <- rownames(main) #select names
+  list(wl=MaxEx, distance = distance, dist0=dist0, purity = dist0/distance) #build list of results
+  
+}
+
+```
+
+## Calcul Spectral purity for Hexagon model
+
+```{r,warning=FALSE, message=FALSE}
+#WITH APIS PHOTORECEPTOR VALUES INTO HEXAGON MODEL: 
+purity<-pureza(A.hexInv,apis_ev_Hex) #launch function
+Purity_T<-bind_cols(names(purity$distance),purity$wl,purity$dist0,purity$distance,purity$purity) #create table
+names(Purity_T)<-c("species","wl","dist0","distance","purity") 
+PInv<-Purity_T
+PInv<-PInv%>%mutate(cat="Invasives")
+
+purity<-pureza(A.hexGp1,apis_ev_Hex) #launch function
+Purity_T<-bind_cols(names(purity$distance),purity$wl,purity$dist0,purity$distance,purity$purity) #create table
+names(Purity_T)<-c("species","wl","dist0","distance","purity") 
+PG1<-Purity_T
+PG1<-PG1%>%mutate(cat="Gp1")
+
+purity<-pureza(A.hexGp2,apis_ev_Hex) #launch function
+Purity_T<-bind_cols(names(purity$distance),purity$wl,purity$dist0,purity$distance,purity$purity) #create table
+names(Purity_T)<-c("species","wl","dist0","distance","purity") 
+PG2<-Purity_T
+PG2<-PG2%>%mutate(cat="Gp2")
+
+purity<-pureza(A.hexInvU,apis_ev_Hex) #launch function
+Purity_T<-bind_cols(names(purity$distance),purity$wl,purity$dist0,purity$distance,purity$purity) #create table
+names(Purity_T)<-c("species","wl","dist0","distance","purity") 
+PInvU<-Purity_T
+PInvU<-PInvU%>%mutate(cat=species)
+
+#Bind
+Ptot<-bind_rows(PInv,PG1,PG2,PInvU)
+
+```
+
+
+# Open abundance measurement data
+
+```{r,warning=FALSE, message=FALSE}
+setwd("/Users/martin/Downloads/Github_DATA/0_Data")
+geo<-read.table("abundancy_measurements.csv",sep=",",header=T)
+g2<-geo %>% gather(key="zone",value=abundance,core:neighborhood)
+resume_contrasts<-read.table("resume_contrasts.csv",sep="",header=T)
+g3<-left_join(resume_contrasts,g2,by=c("species"="species"))
+gf1<-g3 %>% filter(patch!=~is.na(.)) %>% filter(abundance!=0)
+gf1$zone<-factor(gf1$zone,levels=(c("core","internal",
+                                    "external","neighborhood")))
+gf1$cat<-factor(gf1$cat,levels=(c("inv","gp1",
+                                  "gp2")))
+gf2<-gf1 %>% mutate(cat=str_replace(cat,"inv","Invasives")) %>% 
+  mutate(cat=str_replace(cat,"gp1","Group 1")) %>% 
+  mutate(cat=str_replace(cat,"gp2","Group 2")) 
+
+gf2$cat<-factor(gf2$cat,levels=(c("Invasives","Group 1",
+                                  "Group 2")))
+gf2$patch<-as.factor(gf2$patch)
+ginv<-gf2 %>% filter(cat=="Invasives") %>% 
+  group_by(species,zone) %>% 
+  dplyr::summarise(abundance=mean(abundance)) %>% ungroup()
+
+```
+
+
+# Save workspace
+```{r,warning=FALSE, message=FALSE}
+Apis_DS<-Ctot
+Apis_SP<-Ptot
+
+APIS<-bind_cols(Apis_DS,Apis_SP) %>%
+  select(!cat...11) %>%
+  select(!patch2) %>% 
+  rename(cat=cat...5)
+
+setwd("/Users/martin/Downloads/Github_DATA/1_Prepare_data")
+
+save.image(file = "AllData.RData")
+```

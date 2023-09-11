@@ -1,0 +1,168 @@
+---
+title: "Spectral reflectance curves and flower colors in perceptual color spaces"
+author: "Martin Dessart"
+date: "11/09/2023"
+output:
+  html_document:
+    toc: true
+    theme: united
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=15,fig.height=8)
+```
+
+# Prepare data
+
+```{r,warning=FALSE, message=FALSE}
+library(dplyr)
+library(data.table)
+library(factoextra)
+library(ggplot2)
+library(devtools)
+library(NbClust)
+library(devtools)
+library(ggbiplot)
+library(pavo)
+library(conflicted)
+library(tibble)
+conflict_prefer("rename", "dplyr")
+conflict_prefer("mutate", "dplyr")
+conflict_prefer("filter", "dplyr")
+
+rm(list=ls())
+set.seed(666) #Fix kernell
+setwd("/Users/martin/Downloads/Github_DATA/0_Data")
+load("AllData.RData")
+
+
+```
+
+# Display Reflectance data
+
+## Invasive flowers
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+S1_A<-S1%>%
+  rename("A1"=everything())
+S1_A<-as.rspec(S1_A)
+
+S1_G1<-S1 %>% 
+  select(!Impatiens_glandulifera_P)%>%
+  select(!Impatiens_glandulifera_V)%>%
+  select(!Impatiens_glandulifera_W) %>% 
+  select(!Buddleja_davidii) %>% 
+  select(!Reynoutria_japonica) %>% 
+  select(!Spiraea_japonica)
+S1_G1<-as.rspec(S1_G1)
+
+
+S2_B<-S2%>%
+  rename("B1"=everything())
+S2_B<-as.rspec(S2_B)
+
+Gro<-bind_cols(S1_A,S2_B)%>%
+  select(!wl...56)
+Gro<-as.rspec(Gro)
+
+#INVASIVE
+SBRS<-SInv%>%
+  select(!Impatiens_glandulifera_P)%>%
+  select(!Impatiens_glandulifera_V)%>%
+  select(!Impatiens_glandulifera_W)
+
+SIMP<-SInv%>%
+  select(wl|Impatiens_glandulifera_P|
+           Impatiens_glandulifera_V|
+           Impatiens_glandulifera_W) %>% 
+  rowwise() %>% 
+  dplyr::mutate("YO1"=sum(Impatiens_glandulifera_P+
+                            Impatiens_glandulifera_V+
+                            Impatiens_glandulifera_W)/3) %>% 
+  select(!Impatiens_glandulifera_P)%>%
+  select(!Impatiens_glandulifera_V)%>%
+  select(!Impatiens_glandulifera_W)
+SIMP<-as.rspec(SIMP)
+
+T6<-bind_rows(bind_cols(Fmean,SIMP,SBRS)%>%
+                select(!wl...3)%>%
+                select(!wl...5) 
+)
+T6<-as.rspec(T6)
+SP<- gsub('[0-9]','', names(T6))[-1]
+
+#ALLL 
+
+yo<-par(mgp=c(12,1.5,0),mar=c(6,6,4,1)+.1)
+aggplot(T6,b=SP,xlim=c(300,650),alpha=c(0.2),
+        lcol=c("darkgreen","darksalmon","deeppink4","darkgoldenrod1",
+               "darkorchid3"),lwd=5,cex.lab=3,cex.axis=2.6,axes=F, ann=F)
+axis(1, cex.axis = 2.3, lwd=4,lwd.ticks=3)
+axis(2, cex.axis = 2.3, lwd=4,lwd.ticks=4)
+title(ylab = "Reflectance (%)", cex.lab = 3,
+      line = 4)
+title(xlab = "Wavelength (nm)", cex.lab = 3,
+      line = 4)
+legend("topleft",legend=c("Green background", "IG","BD","RJ","SJ"),
+       col=c("darkgreen",
+             "darksalmon","deeppink4",
+             "darkgoldenrod1","darkorchid3"),
+       lwd=8, cex=1)
+
+```
+
+## Detail on Impatiens glandulifera
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+SInvFinal<-SInv %>% select(!Buddleja_davidii) %>% 
+  select(!Reynoutria_japonica) %>% 
+  select(!Spiraea_japonica)
+sinvnname<-names(SInvFinal)
+aggplot(SInvFinal,b=sinvnname,xlim=c(300,650),ylim=c(0,100),alpha=c(0.2),
+        lcol=spec2rgb(SInvFinal),lwd=5,cex.lab=3,cex.axis=2.6,axes=F, ann=F)
+axis(1, cex.axis = 2.3, lwd=4,lwd.ticks=3)
+axis(2, cex.axis = 2.3, lwd=4,lwd.ticks=4)
+title(ylab = "Reflectance (%)", cex.lab = 3,
+      line = 4)
+title(xlab = "Wavelength (nm)", cex.lab = 3,
+      line = 4)
+
+legend("top",legend=c("Ig P","Ig V","Ig W"),
+       lwd=8, cex=1,col=c(rgb(227,199,203,255, maxColorValue=255),
+                          rgb(156,95,127,255, maxColorValue=255),
+                          rgb(141,85,103,255, maxColorValue=255)))
+
+legend("top",legend=sinvnname,
+       lwd=8, cex=1,col=c(rgb(227,199,203,255, maxColorValue=255),
+                          rgb(156,95,127,255, maxColorValue=255),
+                          rgb(141,85,103,255, maxColorValue=255)))
+```
+
+
+
+# Display models 
+
+## Hexagon & COC model
+
+```{r,echo=FALSE,warning=FALSE, message=FALSE}
+hexplot(A.hexAutoch, labels=T, sectors='coarse', bg="black",
+        pch=21,cex=1.3,labels.cex=2.5,mar=c(14, 14,0,0),
+        out.lwd=5)
+points(A.hexInv,pch=23,bg="white",cex=1.8,lwd = 3)
+#points(A.hexGp2,pch=24,bg=spec2rgb(S2),cex=1.3)
+points(apis_ev_Hex, col="gray10", pch=20,cex=2)
+points(apis_ev_Hex, col="gray10", type="l",lwd=3)
+
+cocplot(C.cocAutoch, labels=T, bg="black",
+        pch=21,cex=1.3,labels.cex=2.5,
+        square = T)
+
+points(C.cocInv,pch=23,bg="white",cex=1.6,lwd = 3)
+#points(C.cocGp2,pch=24,bg=spec2rgb(S2),cex=1.3)
+points(apis_ev_Coc, col="gray10", pch=20,cex=2)
+points(apis_ev_Coc, col="gray10", type="l",lwd=3)
+```
+
+
+
