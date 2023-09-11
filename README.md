@@ -27,7 +27,8 @@ Email: sylvie.guillerme@univ-tlse2.fr                                           
 5. Question 2: Are pollinators able to discriminate invasive flowers species from native flowers species?
 
 # Dependencies
-* R version 4.1.1 (2021-08-10) -- "Kick Things"
+* R version 4.0.4 (2021-02-15) -- "Lost Library Book"
+
 
 # Licence
 This project is licensed under [MIT Licence](https://opensource.org/license/mit/).
